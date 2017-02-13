@@ -2,10 +2,11 @@
 // Written 2017 by Jonas Byström, highfestiva@gmail.com.
 // Open source, use as you like.
 
-var gl = null;
-var shaderProgram = null;
-var lineTexture = null;
-var canvasLineWidth = null;
+var canvasIndex = 0;
+var gls = {};
+var shaderPrograms = {};
+var lineTextures = {};
+var canvasLineWidths = {};
 
 function Vec(x, y) {
 	this.x = x;
@@ -132,13 +133,17 @@ function toBezierControlPoints(xData, yData) {
 }
 
 function initGraph(canvas, lineImage, lineWidth) {
-	if (gl == null) {
+	var key = canvas.getAttribute('yarnIndex');
+	if (gls[key] == null) {
+		key = ++canvasIndex;
+		canvas.setAttribute('yarnIndex', key);
 		canvas.width  = canvas.parentElement.clientWidth;
 		canvas.height = canvas.parentElement.clientHeight;
-		gl = canvas.getContext('webgl');
+		gls[key] = canvas.getContext('webgl');
 	}
-	lineTexture = lineImage;
-	canvasLineWidth = lineWidth * 1.35 * lineTexture.height / gl.canvas.height;
+	gl = gls[key];
+	lineTextures[key] = lineImage;
+	canvasLineWidths[key] = lineWidth * 1.35 * lineTextures[key].height / gl.canvas.height;
 
 	// Create, compile and link shaders.
 	var vertCode =
@@ -162,20 +167,22 @@ function initGraph(canvas, lineImage, lineWidth) {
 	var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
 	gl.shaderSource(fragShader, fragCode);
 	gl.compileShader(fragShader);
-	shaderProgram = gl.createProgram();
-	gl.attachShader(shaderProgram, vertShader);
-	gl.attachShader(shaderProgram, fragShader);
-	gl.linkProgram(shaderProgram);
-	gl.useProgram(shaderProgram);
+	shaderPrograms[key] = gl.createProgram();
+	gl.attachShader(shaderPrograms[key], vertShader);
+	gl.attachShader(shaderPrograms[key], fragShader);
+	gl.linkProgram(shaderPrograms[key]);
+	gl.useProgram(shaderPrograms[key]);
 
 	// Setup texture and settings.
 	gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, lineTexture);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, lineTextures[key]);
 }
 
-function render(yData, xData) {
+function render(canvas, yData, xData) {
+	var key = canvas.getAttribute('yarnIndex');
+	gl = gls[key];
 	xData = generateXData(yData, xData);
 	yData = yData.slice();
 	normalizeArray(xData);
@@ -183,8 +190,8 @@ function render(yData, xData) {
 
 	var points = toBezierControlPoints(xData, yData);
 	var canvasHWRatio = gl.canvas.height / gl.canvas.width;
-	var textureXScaleFactor = 0.5 * gl.canvas.width / lineTexture.width;
-	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, canvasLineWidth, canvasHWRatio, textureXScaleFactor);
+	var textureXScaleFactor = 0.5 * gl.canvas.width / lineTextures[key].width;
+	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, canvasLineWidths[key], canvasHWRatio, textureXScaleFactor);
 	//console.log(quads);
 	//console.log(textureQuads);
 	//console.log(triangleIndices);
@@ -202,11 +209,11 @@ function render(yData, xData) {
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangleIndices), gl.STATIC_DRAW);
 
 	// Connect shaders and bind buffers.
-	var posLocation = gl.getAttribLocation(shaderProgram, "a_pos");
+	var posLocation = gl.getAttribLocation(shaderPrograms[key], "a_pos");
 	gl.enableVertexAttribArray(posLocation);
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 	gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 0, 0);
-	var texLocation = gl.getAttribLocation(shaderProgram, "a_tex");
+	var texLocation = gl.getAttribLocation(shaderPrograms[key], "a_tex");
 	gl.enableVertexAttribArray(texLocation);
 	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
 	gl.vertexAttribPointer(texLocation, 2, gl.FLOAT, false, 0, 0);
@@ -234,13 +241,12 @@ function loadImage(url, callback) {
 	}
 }
 
-function yarnChart(elementId, yData, xData, yarnName, lineWidth) {
+function yarnChart(canvas, yData, xData, yarnName, lineWidth) {
 	xData = generateXData(yData, xData);
 	yarnName = yarnName != null? yarnName : 'yarn.png';
 	lineWidth = lineWidth != null? lineWidth : 1.0;
 	loadImage('yarn.png', function(lineImage) {
-		var canvas = document.getElementById(elementId);
 		initGraph(canvas, lineImage, lineWidth);
-		render(yData, xData);
+		render(canvas, yData, xData);
 	});
 }

@@ -2,24 +2,32 @@
 <html>
 <head>
 <style>
-html, body {
-	height: 95vh;
-	margin: 0;
-	padding: 0;
+div {
+	height: 40vh;
 }
 </style>
 </head>
 <body>
-<canvas id="graph-canvas"></canvas>
+<h1>Yarn Chart A</h1>
+<div><canvas id="canvasA"></canvas></div>
+<h1>Yarn Chart B</h1>
+<div><canvas id="canvasB"></canvas></div>
 <script src="yarn-chart.js"></script>
 <script>
-var y = [2,3,1,2,0,3,2,4,2,1,2,4,6,4,3,1,2,4,6,4,3,2,3,1,2,0,3,2,4,2,1,2,4,6,4,3,1,2,4,6,4,3,4,3,1,0,0,1,4,3];
-yarnChart('graph-canvas', y);
+var canvasA = document.getElementById('canvasA');
+var canvasB = document.getElementById('canvasB');
+var y = [2,3,1,2,0,3,2,4,2,1,2,4,6,4,3,1,2,4,6,4,3,2,3,1];
+var z = [3,5,4,5,3,3,2,3,4,4,5,5,3,3,2,2,2,2,3,4,5,5,3,4];
+yarnChart(canvasA, y);
+yarnChart(canvasB, z);
 setInterval(function() {
 	y.splice(0, 1);
-	y.push(y[y.length-1] + (Math.random()-0.5)*2);
-	render(y);
-}, 100);
+	y.push(y[y.length-1] + Math.random()-0.5);
+	z.splice(0, 1);
+	z.push(z[z.length-1] + Math.random()-0.5);
+	render(canvasA, y);
+	render(canvasB, z);
+}, 150);
 </script>
 </body>
 </html>
