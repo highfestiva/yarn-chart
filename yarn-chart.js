@@ -262,7 +262,7 @@ function yarnChart(canvas, yData, xData, yarnName, lineWidth) {
 	xData = generateXData(yData, xData);
 	yarnName = yarnName != null? yarnName : 'yarn.png';
 	lineWidth = lineWidth != null? lineWidth : 1.0;
-	loadImage('yarn.png', function(lineImage) {
+	loadImage(yarnName, function(lineImage) {
 		initGraph(canvas, lineImage, lineWidth);
 		render(canvas, yData, xData);
 	});
