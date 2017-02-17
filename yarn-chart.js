@@ -62,6 +62,29 @@ function generateXData(yData, xData) {
 	return xData.slice();
 }
 
+function removeRedundant(xData, yData) {
+	var sameValueCount = 0;
+	var lastValue = -1;
+	for (var i = 0; i < yData.length; i++) {
+		if (yData[i] == lastValue) {
+			sameValueCount += 1
+		} else {
+			if (sameValueCount > 6) {
+				// Remove the middle values, since they are the same and just form a straight line anyway.
+				xData.splice(i-sameValueCount+3, sameValueCount-6);
+				yData.splice(i-sameValueCount+3, sameValueCount-6);
+			}
+			sameValueCount = 1;
+			lastValue = yData[i];
+		}
+	}
+	if (sameValueCount > 6) {
+		// Remove the middle values, since they are the same and just form a straight line anyway.
+		xData.splice(i-sameValueCount+3, sameValueCount-6);
+		yData.splice(i-sameValueCount+3, sameValueCount-6);
+	}
+}
+
 function lerp(t, p0, p1) {
 	return new Vec(p0.x+(p1.x-p0.x)*t, p0.y+(p1.y-p0.y)*t);
 }
@@ -126,6 +149,10 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 function normalizeArray(v) {
 	var min = Math.min.apply(null, v);
 	var max = Math.max.apply(null, v);
+	if (max-min < 0.01) {
+		max += 0.01;
+		min -= 0.01;
+	}
 	var avg = (min+max) / 2;
 	var il = 1.85 / (max - min);
 	for (var i = 0, N = v.length; i < N; ++i) {
@@ -207,6 +234,7 @@ function render(canvas, yData, xData) {
 	yData = yData.slice();
 	normalizeArray(xData);
 	normalizeArray(yData);
+	removeRedundant(xData, yData);
 
 	var points = toBezierControlPoints(xData, yData);
 	var canvasHWRatio = gl.canvas.height / gl.canvas.width;
