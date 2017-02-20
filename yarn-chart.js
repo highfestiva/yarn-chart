@@ -54,7 +54,7 @@ function Vec(x, y) {
 function generateXData(yData, xData) {
 	if (xData == null) {
 		xData = [];
-		for (var i = 0; i < yData.length; i++) {
+		for (var i = 0, N = yData.length; i < N; i++) {
 			xData.push(i);
 		}
 		return xData;
@@ -65,7 +65,7 @@ function generateXData(yData, xData) {
 function removeRedundant(xData, yData) {
 	var sameValueCount = 0;
 	var lastValue = -1;
-	for (var i = 0; i < yData.length; i++) {
+	for (var i = 0, N = yData.length; i < N; i++) {
 		if (yData[i] == lastValue) {
 			sameValueCount += 1
 		} else {
@@ -124,9 +124,9 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 	var triangleIndices = [];
 	var quadTriangleIndices = [2,3,1,2,1,0];
 	for (i = 0; i < N-1; i += 3) {
-		for (var k = 1; k <= 50; ++k) {
+		for (var k = 1; k <= 10; ++k) {
 			// Positional coordinates.
-			var [q,m] = bezierNormal(k/50, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3]);
+			var [q,m] = bezierNormal(k/10, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3]);
 			var l = q.sub(p).len();
 			p = q; n = m;
 			quads = quads.concat(segmentToQuadSide(p, n, lineWidth, hwRatio));
@@ -146,7 +146,8 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 	return [quads, textureQuads, triangleIndices];
 }
 
-function normalizeArray(v) {
+function normalizeArray(v, scale) {
+	scale = scale != null? scale : 1;
 	var min = Math.min.apply(null, v);
 	var max = Math.max.apply(null, v);
 	if (max-min < 0.01) {
@@ -156,13 +157,13 @@ function normalizeArray(v) {
 	var avg = (min+max) / 2;
 	var il = 1.85 / (max - min);
 	for (var i = 0, N = v.length; i < N; ++i) {
-		v[i] = (v[i]-avg) * il;
+		v[i] = (v[i]-avg) * il * scale;
 	}
 }
 
 function toBezierControlPoints(xData, yData) {
 	var data = [];
-	for (var i = 0; i < xData.length; ++i) {
+	for (var i = 0, N = xData.length; i < N; ++i) {
 		data.push(new Vec(xData[i], yData[i]));
 		if (i+1 < xData.length) {
 			var p1 = data[data.length-1];
@@ -189,6 +190,7 @@ function initGraph(canvas, lineImage, lineWidth) {
 		gls[key] = canvas.getContext('webgl');
 	}
 	var gl = gls[key];
+	gl.yScale = 1;
 	lineTextures[key] = lineImage;
 	canvasLineWidths[key] = lineWidth * 1.35 * lineTextures[key].height / gl.canvas.height;
 
@@ -209,7 +211,8 @@ function initGraph(canvas, lineImage, lineWidth) {
 		'uniform sampler2D tex;' +
 		'varying vec2 v_tex;' +
 		'void main(void) {' +
-		'  gl_FragColor = texture2D(tex, v_tex);' +
+		'  vec4 col = texture2D(tex, v_tex);' +
+		'  gl_FragColor = vec4(col.r, col.g, col.b, col.a);' +
 		'}';
 	var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
 	gl.shaderSource(fragShader, fragCode);
@@ -225,15 +228,18 @@ function initGraph(canvas, lineImage, lineWidth) {
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, lineTextures[key]);
+
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+	gl.enable(gl.BLEND);
 }
 
-function render(canvas, yData, xData) {
+function yarnRender(canvas, yData, xData) {
 	var key = canvas.getAttribute('yarnIndex');
 	var gl = gls[key];
 	xData = generateXData(yData, xData);
 	yData = yData.slice();
 	normalizeArray(xData);
-	normalizeArray(yData);
+	normalizeArray(yData, gl.yScale);
 	removeRedundant(xData, yData);
 
 	var points = toBezierControlPoints(xData, yData);
@@ -286,10 +292,11 @@ function loadImage(url, callback) {
 	}
 }
 
-function yarnChart(canvas, yData, xData, yarnName, lineWidth) {
+function yarnChart(canvas, yData, xData, yarnName, lineWidth, render) {
 	xData = generateXData(yData, xData);
 	yarnName = yarnName != null? yarnName : 'yarn.png';
 	lineWidth = lineWidth != null? lineWidth : 1.0;
+	render = render != null? render : yarnRender;
 	loadImage(yarnName, function(lineImage) {
 		initGraph(canvas, lineImage, lineWidth);
 		render(canvas, yData, xData);
