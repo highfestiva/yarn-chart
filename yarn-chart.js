@@ -168,11 +168,11 @@ function toBezierControlPoints(xData, yData) {
 			var p1 = data[data.length-1];
 			var p2 = new Vec(xData[i+1], yData[i+1]);
 			var p0 = i? data[data.length-1-3] : p1;
-			var vp = p2.sub(p1).mul(0.6);
-			var v1 = vp.projectOnto(p1.cornerTangent(p0,p2));
+			var vp = p2.sub(p1).mul(0.7);
+			var v1 = lerp(0.9, vp, vp.projectOnto(p1.cornerTangent(p0,p2)));
 			data.push(p1.add(v1));
 			var p3 = (i+2 < xData.length)? new Vec(xData[i+2], yData[i+2]) : p2;
-			var v2 = vp.projectOnto(p2.cornerTangent(p1,p3));
+			var v2 = lerp(0.9, vp, vp.projectOnto(p2.cornerTangent(p1,p3)));
 			data.push(p2.sub(v2));
 		}
 	}
