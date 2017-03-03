@@ -146,8 +146,10 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 	return [quads, textureQuads, triangleIndices];
 }
 
-function normalizeArray(v, scale) {
+function normalizeArray(v, scale, maxValue) {
 	scale = scale != null? scale : 1;
+	maxValue = maxValue != null? maxValue : 1;
+	var divisor = maxValue * 2;
 	var min = Math.min.apply(null, v);
 	var max = Math.max.apply(null, v);
 	if (max-min < 0.01) {
@@ -155,7 +157,7 @@ function normalizeArray(v, scale) {
 		min -= 0.01;
 	}
 	var avg = (min+max) / 2;
-	var il = 1.85 / (max - min);
+	var il = divisor / (max - min);
 	for (var i = 0, N = v.length; i < N; ++i) {
 		v[i] = (v[i]-avg) * il * scale;
 	}
@@ -239,7 +241,7 @@ function yarnRender(canvas, yData, xData) {
 	xData = generateXData(yData, xData);
 	yData = yData.slice();
 	normalizeArray(xData);
-	normalizeArray(yData, gl.yScale);
+	normalizeArray(yData, gl.yScale, 0.925);
 	removeRedundant(xData, yData);
 
 	var points = toBezierControlPoints(xData, yData);
