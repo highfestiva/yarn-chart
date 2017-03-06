@@ -31,7 +31,11 @@ function Vec(x, y) {
 		return u.add(v).rot90Ccw();
 	}
 	this.projectOnto = function(v) {
-		return v.mul(v.dot(this)/v.magnitude());
+		var mag = v.magnitude();
+		if (mag <= 0) {
+			mag = 1;
+		}
+		return v.mul(v.dot(this)/mag);
 	}
 	this.rot90Ccw = function() {
 		return new Vec(-this.y, this.x);
@@ -98,38 +102,36 @@ function bezier(t, p0, p1, p2, p3) {
 	return lerp(t, r0, r1);
 }
 
-function bezierNormal(t, p0, p1, p2, p3) {
+function bezierNormal(t, p0, p1, p2, p3, l) {
+	var s = (t>=0.0001)? t-0.0001 : t+0.0001;
 	var p = bezier(t, p0, p1, p2, p3);
-	var p1 = bezier(t+0.001, p0, p1, p2, p3);
-	var tangent = p1.sub(p);
-	var normal = tangent.rot90Ccw().normalize(1);
+	var q = bezier(s, p0, p1, p2, p3);
+	var tangent = (s>t)? q.sub(p) : p.sub(q);
+	var normal = tangent.rot90Ccw().normalize(l);
 	return [p, normal];
 }
 
-function segmentToQuadSide(p, n, lineWidth, hwRatio) {
-	return [p.x+n.x*lineWidth*hwRatio, p.y+n.y*lineWidth,
-		p.x-n.x*lineWidth*hwRatio, p.y-n.y*lineWidth];
+function segmentToQuadSide(p, n, hwRatio) {
+	return [p.x+n.x*hwRatio, p.y+n.y,
+		p.x-n.x*hwRatio, p.y-n.y];
 }
 
-function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, textureXScaleFactor) {
+function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, textureXScaleFactor, accuracy) {
 	var textureX = 0;
 	var indexBase = 0;
-	var i = 0, N = controlPoints.length;
-	var [p,n] = bezierNormal(0, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3]);
-	var quads = segmentToQuadSide(p, n, lineWidth, hwRatio);
-	var textureQuads = [
-		0.0, 0.0,
-		0.0, 1.0,
-	];
+	var i = 0, N = controlPoints.length, K = Math.round(10*accuracy);
+	var [p,n] = bezierNormal(0, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3], lineWidth);
+	var quads = [];
+	var textureQuads = [];
 	var triangleIndices = [];
 	var quadTriangleIndices = [2,3,1,2,1,0];
-	for (i = 0; i < N-1; i += 3) {
-		for (var k = 1; k <= 10; ++k) {
+	for (; i < N-1; i += 3) {
+		for (var k = 0; k < K; ++k) {
 			// Positional coordinates.
-			var [q,m] = bezierNormal(k/10, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3]);
+			var [q,m] = bezierNormal(k/K, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3], lineWidth);
 			var l = q.sub(p).len();
 			p = q; n = m;
-			quads = quads.concat(segmentToQuadSide(p, n, lineWidth, hwRatio));
+			quads = quads.concat(segmentToQuadSide(p, n, hwRatio));
 			// Texture coordinates.
 			textureX += l * textureXScaleFactor;
 			textureQuads = textureQuads.concat([
@@ -143,23 +145,24 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 			indexBase += 2;
 		}
 	}
+	triangleIndices.splice(-quadTriangleIndices.length, quadTriangleIndices.length);
 	return [quads, textureQuads, triangleIndices];
 }
 
-function normalizeArray(v, scale, maxValue) {
-	scale = scale != null? scale : 1;
-	maxValue = maxValue != null? maxValue : 1;
-	var divisor = maxValue * 2;
-	var min = Math.min.apply(null, v);
-	var max = Math.max.apply(null, v);
+function normalizeArray(v, min, max, scale) {
+	if (min == null || max == null) {
+		min = Math.min.apply(null, v);
+		max = Math.max.apply(null, v);
+	}
 	if (max-min < 0.01) {
 		max += 0.01;
 		min -= 0.01;
 	}
-	var avg = (min+max) / 2;
-	var il = divisor / (max - min);
+	var avg = (max + min) / 2;
+	scale = scale!=null? scale : 1;
+	var il = 2*scale / (max - min);
 	for (var i = 0, N = v.length; i < N; ++i) {
-		v[i] = (v[i]-avg) * il * scale;
+		v[i] = (v[i]-avg) * il;
 	}
 }
 
@@ -192,7 +195,9 @@ function initGraph(canvas, lineImage, lineWidth) {
 		gls[key] = canvas.getContext('webgl');
 	}
 	var gl = gls[key];
-	gl.yScale = 1;
+	gl.yMin = null;
+	gl.yMax = null;
+	gl.accuracy = 1;
 	lineTextures[key] = lineImage;
 	canvasLineWidths[key] = lineWidth * 1.35 * lineTextures[key].height / gl.canvas.height;
 
@@ -241,13 +246,19 @@ function yarnRender(canvas, yData, xData) {
 	xData = generateXData(yData, xData);
 	yData = yData.slice();
 	normalizeArray(xData);
-	normalizeArray(yData, gl.yScale, 0.925);
+	var min = gl.yMin;
+	var max = gl.yMax;
+	var scale = 1;
+	if (min == null || max == null) {
+		scale = 0.925;
+	}
+	normalizeArray(yData, min, max, scale);
 	removeRedundant(xData, yData);
 
 	var points = toBezierControlPoints(xData, yData);
 	var canvasHWRatio = gl.canvas.height / gl.canvas.width;
 	var textureXScaleFactor = 0.5 * gl.canvas.width / lineTextures[key].width;
-	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, canvasLineWidths[key], canvasHWRatio, textureXScaleFactor);
+	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, canvasLineWidths[key], canvasHWRatio, textureXScaleFactor, gl.accuracy);
 
 	var vertexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);

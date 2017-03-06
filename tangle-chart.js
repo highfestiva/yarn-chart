@@ -42,9 +42,11 @@ function generateTangles(yData, xData) {
 }
 
 function tangleRender(canvas, yData, xData) {
-	var key = canvas.getAttribute('yarnIndex');
-	gls[key].yScale = 0.3;
 	xData = generateXData(yData, xData);
+	var key = canvas.getAttribute('yarnIndex');
+	var dx = xData[1]-xData[0];
+	gls[key].yMin = -dx;
+	gls[key].yMax = +dx;
 	[yData, xData] = generateTangles(yData, xData);
 	yarnRender(canvas, yData, xData);
 }
