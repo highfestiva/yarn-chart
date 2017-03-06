@@ -45,8 +45,8 @@ function tangleRender(canvas, yData, xData) {
 	xData = generateXData(yData, xData);
 	var key = canvas.getAttribute('yarnIndex');
 	var dx = xData[1]-xData[0];
-	gls[key].yMin = -dx;
-	gls[key].yMax = +dx;
+	gls[key].yMin = -dx*10*canvas.height/canvas.width;
+	gls[key].yMax = +dx*10*canvas.height/canvas.width;
 	[yData, xData] = generateTangles(yData, xData);
 	yarnRender(canvas, yData, xData);
 }
