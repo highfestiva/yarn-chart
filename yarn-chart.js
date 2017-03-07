@@ -6,9 +6,6 @@
 
 var canvasIndex = 0;
 var gls = {};
-var shaderPrograms = {};
-var lineTextures = {};
-var canvasLineWidths = {};
 
 function Vec(x, y) {
 	this.x = x;
@@ -198,8 +195,9 @@ function initGraph(canvas, lineImage, lineWidth) {
 	gl.yMin = null;
 	gl.yMax = null;
 	gl.accuracy = 1;
-	lineTextures[key] = lineImage;
-	canvasLineWidths[key] = lineWidth * 1.35 * lineTextures[key].height / gl.canvas.height;
+	gl.lineWidth = lineWidth;
+	gl.lineTexture = lineImage;
+	gl.canvasLineWidth = lineWidth * 1.35 * gl.lineTexture.height / gl.canvas.height;
 
 	// Create, compile and link shaders.
 	var vertCode =
@@ -224,17 +222,17 @@ function initGraph(canvas, lineImage, lineWidth) {
 	var fragShader = gl.createShader(gl.FRAGMENT_SHADER);
 	gl.shaderSource(fragShader, fragCode);
 	gl.compileShader(fragShader);
-	shaderPrograms[key] = gl.createProgram();
-	gl.attachShader(shaderPrograms[key], vertShader);
-	gl.attachShader(shaderPrograms[key], fragShader);
-	gl.linkProgram(shaderPrograms[key]);
-	gl.useProgram(shaderPrograms[key]);
+	gl.shaderProgram = gl.createProgram();
+	gl.attachShader(gl.shaderProgram, vertShader);
+	gl.attachShader(gl.shaderProgram, fragShader);
+	gl.linkProgram(gl.shaderProgram);
+	gl.useProgram(gl.shaderProgram);
 
 	// Setup texture and settings.
 	gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, lineTextures[key]);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gl.lineTexture);
 
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 	gl.enable(gl.BLEND);
@@ -257,8 +255,8 @@ function yarnRender(canvas, yData, xData) {
 
 	var points = toBezierControlPoints(xData, yData);
 	var canvasHWRatio = gl.canvas.height / gl.canvas.width;
-	var textureXScaleFactor = 0.5 * gl.canvas.width / lineTextures[key].width;
-	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, canvasLineWidths[key], canvasHWRatio, textureXScaleFactor, gl.accuracy);
+	var textureXScaleFactor = 0.5 * gl.canvas.width / gl.lineTexture.width;
+	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, gl.canvasLineWidth, canvasHWRatio, textureXScaleFactor, gl.accuracy);
 
 	var vertexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -273,11 +271,11 @@ function yarnRender(canvas, yData, xData) {
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangleIndices), gl.STATIC_DRAW);
 
 	// Connect shaders and bind buffers.
-	var posLocation = gl.getAttribLocation(shaderPrograms[key], "a_pos");
+	var posLocation = gl.getAttribLocation(gl.shaderProgram, "a_pos");
 	gl.enableVertexAttribArray(posLocation);
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 	gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 0, 0);
-	var texLocation = gl.getAttribLocation(shaderPrograms[key], "a_tex");
+	var texLocation = gl.getAttribLocation(gl.shaderProgram, "a_tex");
 	gl.enableVertexAttribArray(texLocation);
 	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
 	gl.vertexAttribPointer(texLocation, 2, gl.FLOAT, false, 0, 0);
