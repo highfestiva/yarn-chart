@@ -236,6 +236,10 @@ function initGraph(canvas, lineImage, lineWidth) {
 
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 	gl.enable(gl.BLEND);
+
+	gl.vertexBuffer = gl.createBuffer();
+	gl.textureBuffer = gl.createBuffer();
+	gl.indexBuffer = gl.createBuffer();
 }
 
 function yarnRender(canvas, yData, xData) {
@@ -258,36 +262,28 @@ function yarnRender(canvas, yData, xData) {
 	var textureXScaleFactor = 0.5 * gl.canvas.width / gl.lineTexture.width;
 	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, gl.canvasLineWidth, canvasHWRatio, textureXScaleFactor, gl.accuracy);
 
-	var vertexBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quads), gl.STATIC_DRAW);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.vertexBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quads), gl.DYNAMIC_DRAW);
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
-	var textureBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureQuads), gl.STATIC_DRAW);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.textureBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureQuads), gl.DYNAMIC_DRAW);
 	gl.bindBuffer(gl.ARRAY_BUFFER, null);
-	var indexBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangleIndices), gl.STATIC_DRAW);
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.indexBuffer);
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangleIndices), gl.DYNAMIC_DRAW);
 
 	// Connect shaders and bind buffers.
 	var posLocation = gl.getAttribLocation(gl.shaderProgram, "a_pos");
 	gl.enableVertexAttribArray(posLocation);
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.vertexBuffer);
 	gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 0, 0);
 	var texLocation = gl.getAttribLocation(gl.shaderProgram, "a_tex");
 	gl.enableVertexAttribArray(texLocation);
-	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+	gl.bindBuffer(gl.ARRAY_BUFFER, gl.textureBuffer);
 	gl.vertexAttribPointer(texLocation, 2, gl.FLOAT, false, 0, 0);
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer); 
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.indexBuffer); 
 
 	// Render the indices.
 	gl.drawElements(gl.TRIANGLES, triangleIndices.length, gl.UNSIGNED_SHORT, 0);
-
-	gl.bindBuffer(gl.ARRAY_BUFFER, null);
-	gl.deleteBuffer(vertexBuffer);
-	gl.deleteBuffer(textureBuffer);
-	gl.deleteBuffer(indexBuffer);
 };
 
 function loadImage(url, callback) {
@@ -312,4 +308,10 @@ function yarnChart(canvas, yData, xData, yarnName, lineWidth, render) {
 		initGraph(canvas, lineImage, lineWidth);
 		render(canvas, yData, xData);
 	});
+	return {
+		update: function(y, x) {
+			render(canvas, y, x);
+		}
+	};
+
 }
