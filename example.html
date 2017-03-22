@@ -23,16 +23,16 @@ var canvasC = document.getElementById('canvasC');
 var x = [2,3,1,2,0,3,2,4,2,1,2,4,6,4,3,1,2,4,6,4,3,2,3,1];
 var y = [3,5,4,5,0,3,2,0,4,4,9,0,3,3,2,2,2,2,3,4,5,5,3,9].map(x=>x*25);
 var z = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0].map(x=>x*300);
-yarnChart(canvasA, x);
-tangleChart(canvasB, y);
-tangleChart(canvasC, z, null, null, 0.3);
+yarnChart.init(canvasA, x);
+yarnChart.initTangleChart(canvasB, y);
+yarnChart.initTangleChart(canvasC, z, null, null, 0.3);
 setInterval(function() {
 	x.splice(0, 1);
 	x.push(x[x.length-1] + Math.random()-0.5);
 	y.splice(0, 1);
 	y.push(y[y.length-1] + Math.random()*40-20);
-	yarnRender(canvasA, x);
-	tangleRender(canvasB, y);
+	yarnChart.yarnRender(canvasA, x);
+	yarnChart.tangleRender(canvasB, y);
 }, 150);
 </script>
 </body>

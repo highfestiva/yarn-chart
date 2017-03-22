@@ -4,20 +4,22 @@
 
 "use strict";
 
-var canvasIndex = 0;
-var gls = {};
+var yarnChart = {};
+yarnChart.canvasIndex = 0;
+yarnChart.gls = {};
 
-function Vec(x, y) {
+
+yarnChart.Vec = function(x, y) {
 	this.x = x;
 	this.y = y;
 	this.add = function(v) {
-		return new Vec(this.x+v.x, this.y+v.y);
+		return new yarnChart.Vec(this.x+v.x, this.y+v.y);
 	}
 	this.sub = function(v) {
-		return new Vec(this.x-v.x, this.y-v.y);
+		return new yarnChart.Vec(this.x-v.x, this.y-v.y);
 	}
 	this.neg = function() {
-		return new Vec(-this.x, -this.y);
+		return new yarnChart.Vec(-this.x, -this.y);
 	}
 	this.dot = function(v) {
 		return this.x*v.x + this.y*v.y;
@@ -35,14 +37,14 @@ function Vec(x, y) {
 		return v.mul(v.dot(this)/mag);
 	}
 	this.rot90Ccw = function() {
-		return new Vec(-this.y, this.x);
+		return new yarnChart.Vec(-this.y, this.x);
 	}
 	this.mul = function(f) {
-		return new Vec(this.x*f, this.y*f);
+		return new yarnChart.Vec(this.x*f, this.y*f);
 	}
 	this.normalize = function(l) {
 		var L = l / this.len();
-		return new Vec(this.x*L, this.y*L);
+		return new yarnChart.Vec(this.x*L, this.y*L);
 	}
 	this.len = function() {
 		return Math.sqrt(this.x*this.x + this.y*this.y);
@@ -52,7 +54,7 @@ function Vec(x, y) {
 	}
 }
 
-function generateXData(yData, xData) {
+yarnChart.generateXData = function(yData, xData) {
 	if (xData == null) {
 		xData = [];
 		for (var i = 0, N = yData.length; i < N; i++) {
@@ -63,7 +65,7 @@ function generateXData(yData, xData) {
 	return xData.slice();
 }
 
-function removeRedundant(xData, yData) {
+yarnChart.removeRedundant = function(xData, yData) {
 	var sameValueCount = 0;
 	var lastValue = -1;
 	for (var i = 0, N = yData.length; i < N; i++) {
@@ -86,38 +88,38 @@ function removeRedundant(xData, yData) {
 	}
 }
 
-function lerp(t, p0, p1) {
-	return new Vec(p0.x+(p1.x-p0.x)*t, p0.y+(p1.y-p0.y)*t);
+yarnChart.lerp = function(t, p0, p1) {
+	return new yarnChart.Vec(p0.x+(p1.x-p0.x)*t, p0.y+(p1.y-p0.y)*t);
 }
 
-function bezier(t, p0, p1, p2, p3) {
-	var q0 = lerp(t, p0, p1);
-	var q1 = lerp(t, p1, p2);
-	var q2 = lerp(t, p2, p3);
-	var r0 = lerp(t, q0, q1);
-	var r1 = lerp(t, q1, q2);
-	return lerp(t, r0, r1);
+yarnChart.bezier = function(t, p0, p1, p2, p3) {
+	var q0 = yarnChart.lerp(t, p0, p1);
+	var q1 = yarnChart.lerp(t, p1, p2);
+	var q2 = yarnChart.lerp(t, p2, p3);
+	var r0 = yarnChart.lerp(t, q0, q1);
+	var r1 = yarnChart.lerp(t, q1, q2);
+	return yarnChart.lerp(t, r0, r1);
 }
 
-function bezierNormal(t, p0, p1, p2, p3, l) {
+yarnChart.bezierNormal = function(t, p0, p1, p2, p3, l) {
 	var s = (t>=0.0001)? t-0.0001 : t+0.0001;
-	var p = bezier(t, p0, p1, p2, p3);
-	var q = bezier(s, p0, p1, p2, p3);
+	var p = yarnChart.bezier(t, p0, p1, p2, p3);
+	var q = yarnChart.bezier(s, p0, p1, p2, p3);
 	var tangent = (s>t)? q.sub(p) : p.sub(q);
 	var normal = tangent.rot90Ccw().normalize(l);
 	return [p, normal];
 }
 
-function segmentToQuadSide(p, n, hwRatio) {
+yarnChart.segmentToQuadSide = function(p, n, hwRatio) {
 	return [p.x+n.x*hwRatio, p.y+n.y,
 		p.x-n.x*hwRatio, p.y-n.y];
 }
 
-function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, textureXScaleFactor, accuracy) {
+yarnChart.bezierCtrlToLineTextureQuads = function(controlPoints, lineWidth, hwRatio, textureXScaleFactor, accuracy) {
 	var textureX = 0;
 	var indexBase = 0;
 	var i = 0, N = controlPoints.length, K = Math.round(10*accuracy);
-	var [p,n] = bezierNormal(0, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3], lineWidth);
+	var [p,n] = yarnChart.bezierNormal(0, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3], lineWidth);
 	var quads = [];
 	var textureQuads = [];
 	var triangleIndices = [];
@@ -125,10 +127,10 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 	for (; i < N-1; i += 3) {
 		for (var k = 0; k < K; ++k) {
 			// Positional coordinates.
-			var [q,m] = bezierNormal(k/K, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3], lineWidth);
+			var [q,m] = yarnChart.bezierNormal(k/K, controlPoints[i+0], controlPoints[i+1], controlPoints[i+2], controlPoints[i+3], lineWidth);
 			var l = q.sub(p).len();
 			p = q; n = m;
-			quads = quads.concat(segmentToQuadSide(p, n, hwRatio));
+			quads = quads.concat(yarnChart.segmentToQuadSide(p, n, hwRatio));
 			// Texture coordinates.
 			textureX += l * textureXScaleFactor;
 			textureQuads = textureQuads.concat([
@@ -146,7 +148,7 @@ function bezierCtrlToLineTextureQuads(controlPoints, lineWidth, hwRatio, texture
 	return [quads, textureQuads, triangleIndices];
 }
 
-function normalizeArray(v, min, max, scale) {
+yarnChart.normalizeArray = function(v, min, max, scale) {
 	if (min == null || max == null) {
 		min = Math.min.apply(null, v);
 		max = Math.max.apply(null, v);
@@ -163,35 +165,35 @@ function normalizeArray(v, min, max, scale) {
 	}
 }
 
-function toBezierControlPoints(xData, yData) {
+yarnChart.toBezierControlPoints = function(xData, yData) {
 	var data = [];
 	for (var i = 0, N = xData.length; i < N; ++i) {
-		data.push(new Vec(xData[i], yData[i]));
+		data.push(new yarnChart.Vec(xData[i], yData[i]));
 		if (i+1 < xData.length) {
 			var p1 = data[data.length-1];
-			var p2 = new Vec(xData[i+1], yData[i+1]);
+			var p2 = new yarnChart.Vec(xData[i+1], yData[i+1]);
 			var p0 = i? data[data.length-1-3] : p1;
 			var vp = p2.sub(p1).mul(0.7);
-			var v1 = lerp(0.9, vp, vp.projectOnto(p1.cornerTangent(p0,p2)));
+			var v1 = yarnChart.lerp(0.9, vp, vp.projectOnto(p1.cornerTangent(p0,p2)));
 			data.push(p1.add(v1));
-			var p3 = (i+2 < xData.length)? new Vec(xData[i+2], yData[i+2]) : p2;
-			var v2 = lerp(0.9, vp, vp.projectOnto(p2.cornerTangent(p1,p3)));
+			var p3 = (i+2 < xData.length)? new yarnChart.Vec(xData[i+2], yData[i+2]) : p2;
+			var v2 = yarnChart.lerp(0.9, vp, vp.projectOnto(p2.cornerTangent(p1,p3)));
 			data.push(p2.sub(v2));
 		}
 	}
 	return data;
 }
 
-function initGraph(canvas, lineImage, lineWidth) {
+yarnChart.initGraph = function(canvas, lineImage, lineWidth) {
 	var key = canvas.getAttribute('yarnIndex');
-	if (gls[key] == null) {
-		key = ++canvasIndex;
+	if (yarnChart.gls[key] == null) {
+		key = ++yarnChart.canvasIndex;
 		canvas.setAttribute('yarnIndex', key);
 		canvas.width  = canvas.parentElement.clientWidth;
 		canvas.height = canvas.parentElement.clientHeight;
-		gls[key] = canvas.getContext('webgl');
+		yarnChart.gls[key] = canvas.getContext('webgl');
 	}
-	var gl = gls[key];
+	var gl = yarnChart.gls[key];
 	gl.yMin = null;
 	gl.yMax = null;
 	gl.accuracy = 1;
@@ -242,25 +244,25 @@ function initGraph(canvas, lineImage, lineWidth) {
 	gl.indexBuffer = gl.createBuffer();
 }
 
-function yarnRender(canvas, yData, xData) {
+yarnChart.yarnRender = function(canvas, yData, xData) {
 	var key = canvas.getAttribute('yarnIndex');
-	var gl = gls[key];
-	xData = generateXData(yData, xData);
+	var gl = yarnChart.gls[key];
+	xData = yarnChart.generateXData(yData, xData);
 	yData = yData.slice();
-	normalizeArray(xData);
+	yarnChart.normalizeArray(xData);
 	var min = gl.yMin;
 	var max = gl.yMax;
 	var scale = 1;
 	if (min == null || max == null) {
 		scale = 0.925;
 	}
-	normalizeArray(yData, min, max, scale);
-	removeRedundant(xData, yData);
+	yarnChart.normalizeArray(yData, min, max, scale);
+	yarnChart.removeRedundant(xData, yData);
 
-	var points = toBezierControlPoints(xData, yData);
+	var points = yarnChart.toBezierControlPoints(xData, yData);
 	var canvasHWRatio = gl.canvas.height / gl.canvas.width;
 	var textureXScaleFactor = 0.5 * gl.canvas.width / gl.lineTexture.width;
-	var [quads, textureQuads, triangleIndices] = bezierCtrlToLineTextureQuads(points, gl.canvasLineWidth, canvasHWRatio, textureXScaleFactor, gl.accuracy);
+	var [quads, textureQuads, triangleIndices] = yarnChart.bezierCtrlToLineTextureQuads(points, gl.canvasLineWidth, canvasHWRatio, textureXScaleFactor, gl.accuracy);
 
 	gl.bindBuffer(gl.ARRAY_BUFFER, gl.vertexBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quads), gl.DYNAMIC_DRAW);
@@ -286,7 +288,7 @@ function yarnRender(canvas, yData, xData) {
 	gl.drawElements(gl.TRIANGLES, triangleIndices.length, gl.UNSIGNED_SHORT, 0);
 };
 
-function loadImage(url, callback) {
+yarnChart.loadImage = function(url, callback) {
 	var lineTexture = new Image();
 	try {
 		if ((new URL(url)).origin !== window.location.origin) {
@@ -299,13 +301,13 @@ function loadImage(url, callback) {
 	}
 }
 
-function yarnChart(canvas, yData, xData, yarnName, lineWidth, render) {
-	xData = generateXData(yData, xData);
+yarnChart.init = function(canvas, yData, xData, yarnName, lineWidth, render) {
+	xData = yarnChart.generateXData(yData, xData);
 	yarnName = yarnName != null? yarnName : 'yarn.png';
 	lineWidth = lineWidth != null? lineWidth : 1.0;
-	render = render != null? render : yarnRender;
-	loadImage(yarnName, function(lineImage) {
-		initGraph(canvas, lineImage, lineWidth);
+	render = render != null? render : yarnChart.yarnRender;
+	yarnChart.loadImage(yarnName, function(lineImage) {
+		yarnChart.initGraph(canvas, lineImage, lineWidth);
 		render(canvas, yData, xData);
 	});
 	return {
@@ -313,5 +315,4 @@ function yarnChart(canvas, yData, xData, yarnName, lineWidth, render) {
 			render(canvas, y, x);
 		}
 	};
-
 }
